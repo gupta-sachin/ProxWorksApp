@@ -9,7 +9,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.activityViewModels
 import com.github.mikephil.charting.charts.LineChart
-import com.github.mikephil.charting.components.AxisBase
 import com.github.mikephil.charting.components.Legend
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.components.YAxis
@@ -24,6 +23,8 @@ import com.proximity.app.R
 import com.proximity.aqi.data.AqiChartEntry
 import com.proximity.aqi.vm.CityViewModel
 import com.proximity.aqi.vm.CityViewModelFactory
+import java.text.SimpleDateFormat
+import java.util.*
 
 private const val LOG_TAG = "CityAqiChartFragment"
 
@@ -36,6 +37,10 @@ class CityAqiChartFragment : Fragment() {
     private lateinit var chart: LineChart
 
     private var START_MILLIS: Long = -1L
+
+    private val SimpleDateFormat_hh_mm_ss_a = SimpleDateFormat("hh:mm:ss a", Locale.ENGLISH).also {
+        it.timeZone = TimeZone.getDefault()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -96,25 +101,40 @@ class CityAqiChartFragment : Fragment() {
         xl.setDrawGridLines(true)
         // xl.setAvoidFirstLastClipping(true); // adding some extra margin before first visible entry
         xl.setAxisMinimum(0f)
+        // xl.granularity = 30f // default 1f is better
+        xl.isGranularityEnabled = true
         // xl.setAxisMaximum(4f); // no-auto-h-scrolling
         // xl.setEnabled(true); // default is true
         xl.setPosition(XAxis.XAxisPosition.BOTTOM)
         xl.setLabelRotationAngle(270f)
 
         xl.setValueFormatter(object : ValueFormatter() {
-            override fun getFormattedValue(value: Float, axis: AxisBase?): String? {
+
+            private val map = mutableMapOf<Float, String>()
+
+            override fun getFormattedValue(value: Float): String {
                 if (BuildConfig.DEBUG) {
-                    Log.d(LOG_TAG, "getFormattedValue() called with: value = $value, axis = $axis")
+                    Log.d(LOG_TAG, "getFormattedValue() $value")
                 }
-                return "Time $value"
+                return map[value] ?: format(value)
+            }
+
+            private fun format(secondsSinceStart: Float): String {
+                if (BuildConfig.DEBUG) {
+                    Log.d(LOG_TAG, "format() $secondsSinceStart")
+                }
+                val dateOfGivenTime = Date(START_MILLIS + (secondsSinceStart * 1000).toLong())
+                val formatted = SimpleDateFormat_hh_mm_ss_a.format(dateOfGivenTime)
+                map[secondsSinceStart] = formatted
+                return formatted
             }
         })
 
         val leftAxis: YAxis = chart.getAxisLeft()
         //leftAxis.setTypeface(tfLight)
         leftAxis.setTextColor(Color.WHITE)
-        leftAxis.setAxisMaximum(600f) // TODO - can it or visible range be made appropriately dynamic?
-        leftAxis.setAxisMinimum(0f) // TODO - can it or visible range be made appropriately dynamic?
+        leftAxis.setAxisMaximum(600f) // TODO - can this (or visible range) be made appropriately dynamic?
+        leftAxis.setAxisMinimum(0f) // TODO - can this (or visible range) be made appropriately dynamic?
         leftAxis.setDrawGridLines(true)
 
         val rightAxis: YAxis = chart.getAxisRight()
@@ -122,14 +142,14 @@ class CityAqiChartFragment : Fragment() {
 
     }
 
-    private fun addEntry(pair: AqiChartEntry) {
+    private fun addEntry(aqiChartEntry: AqiChartEntry) {
         val data: LineData = chart.getData()
 
         if (START_MILLIS == -1L) {
-            START_MILLIS = pair.time
+            START_MILLIS = aqiChartEntry.time
         }
-        val x = ((pair.time - START_MILLIS) / 1000).toFloat()
-        data.addEntry(Entry(x, pair.aqi.toFloat()), 0)
+        val secondsSinceStart = ((aqiChartEntry.time - START_MILLIS) / 1000).toFloat()
+        data.addEntry(Entry(secondsSinceStart, aqiChartEntry.aqi.toFloat()), 0)
         data.notifyDataChanged()
 
         // let the chart know it's data has changed
@@ -140,7 +160,7 @@ class CityAqiChartFragment : Fragment() {
         //chart.setVisibleYRangeMaximum(150f, YAxis.AxisDependency.LEFT);
 
         // move to the latest entry
-        chart.moveViewToX(x)
+        chart.moveViewToX(secondsSinceStart)
 
         // this automatically refreshes the chart (calls invalidate())
         // chart.moveViewTo(data.getXValCount()-7, 55f,
