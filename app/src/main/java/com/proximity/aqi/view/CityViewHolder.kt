@@ -10,7 +10,10 @@ import com.proximity.app.BuildConfig
 import com.proximity.app.R
 import com.proximity.aqi.data.CityUi
 
-class CityViewHolder private constructor(pItemView: View) : RecyclerView.ViewHolder(pItemView) {
+class CityViewHolder private constructor(
+    pItemView: View,
+    private val onItemClickListener: OnItemClickListener
+) : RecyclerView.ViewHolder(pItemView) {
 
     private val mTxvCity: TextView = pItemView.findViewById(R.id.txt_city)
     private val mTxvAqi: TextView = pItemView.findViewById(R.id.txt_aqi)
@@ -18,7 +21,7 @@ class CityViewHolder private constructor(pItemView: View) : RecyclerView.ViewHol
 
     init {
         itemView.setOnClickListener {
-
+            onItemClickListener.onItemClick(adapterPosition)
         }
     }
 
@@ -52,9 +55,16 @@ class CityViewHolder private constructor(pItemView: View) : RecyclerView.ViewHol
 
         const val LOG_TAG = "CityViewHolder"
 
-        fun create(pParent: ViewGroup): CityViewHolder {
+        fun create(pParent: ViewGroup, onItemClickListener: OnItemClickListener): CityViewHolder {
             val inflater = LayoutInflater.from(pParent.context)
-            return CityViewHolder(inflater.inflate(R.layout.item_city_aqi, pParent, false))
+            return CityViewHolder(
+                inflater.inflate(R.layout.item_city_aqi, pParent, false),
+                onItemClickListener
+            )
         }
+    }
+
+    interface OnItemClickListener {
+        fun onItemClick(position: Int)
     }
 }

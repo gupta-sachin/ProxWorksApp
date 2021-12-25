@@ -62,7 +62,7 @@ private val COMPARATOR = object : DiffUtil.ItemCallback<CityUi>() {
 private const val LOG_TAG = "CityListAdapter"
 
 class CityListAdapter(private val viewModel: CityViewModel) :
-    ListAdapter<CityUi, CityViewHolder>(COMPARATOR) {
+    ListAdapter<CityUi, CityViewHolder>(COMPARATOR), CityViewHolder.OnItemClickListener {
 
     override fun onBindViewHolder(holder: CityViewHolder, position: Int) {
         getItem(position)?.let {
@@ -88,10 +88,10 @@ class CityListAdapter(private val viewModel: CityViewModel) :
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CityViewHolder {
-        return CityViewHolder.create(parent)
+        return CityViewHolder.create(parent, this)
     }
 
-    internal fun onItemClick(position: Int) {
+    override fun onItemClick(position: Int) {
         if (BuildConfig.DEBUG) {
             Log.d(LOG_TAG, "onItemClick $position")
         }
@@ -99,7 +99,7 @@ class CityListAdapter(private val viewModel: CityViewModel) :
             return // ideally it should never be so by user action
         }
         getItem(position)?.let {
-            viewModel.sendEventItemClicked(position, it)
+            viewModel.sendEventItemClicked(it.city)
         }
     }
 }

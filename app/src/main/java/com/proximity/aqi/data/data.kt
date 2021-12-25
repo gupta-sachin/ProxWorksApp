@@ -20,3 +20,15 @@ data class CityUi(
     val time: String,
     @ColorRes val aqiTextColor: Int
 )
+
+data class AqiChartEntry(
+    val aqi: Double,
+    val time: Long
+)
+
+sealed class Event {
+    data class ItemClicked(
+        val city: String,
+        var handled: Boolean = false
+    ) : Event()
+}

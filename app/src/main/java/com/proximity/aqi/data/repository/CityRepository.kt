@@ -1,6 +1,7 @@
 package com.proximity.aqi.data.repository
 
 import androidx.annotation.WorkerThread
+import com.proximity.aqi.data.AqiChartEntry
 import com.proximity.aqi.data.City
 import com.proximity.aqi.data.source.local.CityDao
 import com.proximity.aqi.data.source.remote.CityAqiSource
@@ -9,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 // Declares the DAO as a private property in the constructor. Pass in the DAO
 // instead of the whole database, because you only need access to the DAO
-class CityRepository( private val cityDao: CityDao) {
+class CityRepository(private val cityDao: CityDao) {
 
     // Room executes all queries on a separate thread.
     // Observed Flow will notify the observer when the data has changed.
@@ -32,4 +33,6 @@ class CityRepository( private val cityDao: CityDao) {
     suspend fun insertOrUpdate(cities: List<City>) {
         cityDao.insertOrUpdate(cities)
     }
+
+    fun getCityAQIs(city: String): Flow<List<AqiChartEntry>> = cityDao.getCityAQIs(city)
 }

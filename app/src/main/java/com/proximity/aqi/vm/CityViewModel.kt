@@ -3,8 +3,10 @@ package com.proximity.aqi.vm
 import androidx.annotation.ColorRes
 import androidx.lifecycle.*
 import com.proximity.app.R
+import com.proximity.aqi.data.AqiChartEntry
 import com.proximity.aqi.data.City
 import com.proximity.aqi.data.CityUi
+import com.proximity.aqi.data.Event
 import com.proximity.aqi.data.repository.CityRepository
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -81,9 +83,16 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
         repository.insertOrUpdate(cities)
     }
 
-    fun sendEventItemClicked(position: Int, city: CityUi) {
-        TODO("Not yet implemented")
+    private val _eventItemClickedLiveData = MutableLiveData<Event.ItemClicked>()
+
+    val eventItemClickedLiveData: LiveData<Event.ItemClicked> = _eventItemClickedLiveData
+
+    fun sendEventItemClicked(city: String) {
+        _eventItemClickedLiveData.value = Event.ItemClicked(city)
     }
+
+    fun getCityAQIsLiveData(city: String): LiveData<List<AqiChartEntry>> =
+        repository.getCityAQIs(city).asLiveData()
 
     fun connect() {
         repository.connect(this)

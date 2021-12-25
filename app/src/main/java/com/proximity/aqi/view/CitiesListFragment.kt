@@ -28,11 +28,6 @@ import java.net.URI
 
 class CitiesListFragment : Fragment() {
 
-    companion object {
-
-        fun newInstance() = CitiesListFragment()
-    }
-
     private val viewModel: CityViewModel by activityViewModels {
         CityViewModelFactory((requireContext().applicationContext as ProxWorksApp).repository)
     }

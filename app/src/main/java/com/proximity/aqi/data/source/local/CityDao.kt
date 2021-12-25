@@ -3,6 +3,7 @@ package com.proximity.aqi.data.source.local
 import android.util.Log
 import androidx.room.*
 import com.proximity.app.BuildConfig
+import com.proximity.aqi.data.AqiChartEntry
 import com.proximity.aqi.data.City
 import kotlinx.coroutines.flow.Flow
 
@@ -40,4 +41,8 @@ interface CityDao {
             update(toBeUpdated)
         }
     }
+
+    // return latest row for each city
+    @Query("SELECT aqi,time FROM city_table WHERE city = :query ORDER BY time DESC")
+    fun getCityAQIs(query: String): Flow<List<AqiChartEntry>>
 }
