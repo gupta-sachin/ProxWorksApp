@@ -59,16 +59,6 @@ class CityAqiChartFragment : Fragment() {
         return root
     }
 
-    override fun onResume() {
-        super.onResume()
-        viewModel.connect()
-    }
-
-    override fun onPause() {
-        viewModel.closeConnection()
-        super.onPause()
-    }
-
     fun initChartView(city: String) {
         chart.getDescription().setEnabled(false)
 

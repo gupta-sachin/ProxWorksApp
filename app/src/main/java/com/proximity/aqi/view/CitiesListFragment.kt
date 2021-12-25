@@ -48,14 +48,4 @@ class CitiesListFragment : Fragment() {
 
         return root
     }
-
-    override fun onResume() {
-        super.onResume()
-        viewModel.connect()
-    }
-
-    override fun onPause() {
-        viewModel.closeConnection()
-        super.onPause()
-    }
 }

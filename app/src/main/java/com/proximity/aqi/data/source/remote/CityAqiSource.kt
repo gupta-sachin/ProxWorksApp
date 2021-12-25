@@ -25,6 +25,7 @@ object CityAqiSource {
     private lateinit var viewModel: CityViewModel
 
     fun connect(viewModel: CityViewModel) {
+        closeConnection()
         this.viewModel = viewModel
         createWebSocketClient()
         val socketFactory: SSLSocketFactory = SSLSocketFactory.getDefault() as SSLSocketFactory
@@ -33,7 +34,9 @@ object CityAqiSource {
     }
 
     fun closeConnection() {
-        webSocketClient.close()
+        if (::webSocketClient.isInitialized) {
+            webSocketClient.close()
+        }
     }
 
     private fun createWebSocketClient() {

@@ -17,6 +17,10 @@ private const val LOG_TAG = "AqiMainActivity"
 
 class AqiMainActivity : AppCompatActivity() {
 
+    private val viewModel: CityViewModel by viewModels {
+        CityViewModelFactory((application as ProxWorksApp).repository)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.aqi_main_activity)
@@ -24,10 +28,6 @@ class AqiMainActivity : AppCompatActivity() {
             supportFragmentManager.commit {
                 add<CitiesListFragment>(R.id.container)
             }
-        }
-
-        val viewModel: CityViewModel by viewModels {
-            CityViewModelFactory((application as ProxWorksApp).repository)
         }
 
         viewModel.eventItemClickedLiveData.observe(this) {
@@ -43,5 +43,15 @@ class AqiMainActivity : AppCompatActivity() {
                 replace<CityAqiChartFragment>(R.id.container)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.connect()
+    }
+
+    override fun onPause() {
+        viewModel.closeConnection()
+        super.onPause()
     }
 }
