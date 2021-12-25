@@ -22,10 +22,9 @@ abstract class CityRoomDatabase : RoomDatabase() {
             // if the INSTANCE is not null, then return it,
             // if it is, then create the database
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                        context.applicationContext,
-                        CityRoomDatabase::class.java,
-                        "city_database"
+                val instance = Room.inMemoryDatabaseBuilder(
+                    context.applicationContext,
+                    CityRoomDatabase::class.java
                 ).build()
                 INSTANCE = instance
                 // return instance

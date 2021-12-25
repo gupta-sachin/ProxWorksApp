@@ -8,10 +8,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CityDao {
-    @Query("SELECT * FROM city_table ORDER BY city ASC")
+
+    // return latest row for each city
+    @Query("SELECT * FROM (SELECT * FROM city_table ORDER BY city ASC, id ASC) GROUP BY city")
     fun getCities(): Flow<List<City>>
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert
     suspend fun insert(cities: List<City>): List<Long>
 
     @Update

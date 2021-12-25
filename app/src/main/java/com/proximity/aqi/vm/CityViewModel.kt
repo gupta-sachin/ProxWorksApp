@@ -14,6 +14,8 @@ import java.util.concurrent.TimeUnit
 
 class CityViewModel(private val repository: CityRepository) : ViewModel() {
 
+    private val ONE_SECOND_AS_MILLIS = TimeUnit.SECONDS.toMillis(1)
+
     private val ONE_MINUTE_AS_MILLIS = TimeUnit.MINUTES.toMillis(1)
 
     private val SimpleDateFormat_MMM_dd_yyyy =
@@ -44,7 +46,8 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
         val currentTime = System.currentTimeMillis()
         val gap = currentTime - time
         return when {
-            gap < ONE_MINUTE_AS_MILLIS -> "A few seconds ago"
+            gap < 15 * ONE_SECOND_AS_MILLIS -> "A few seconds ago"
+            gap < ONE_MINUTE_AS_MILLIS -> "${gap / 1000} seconds ago"
             gap < 2 * ONE_MINUTE_AS_MILLIS -> "A minute ago"
             else -> {
                 val dateOfGivenTime = Date(time)
