@@ -36,7 +36,8 @@ class CityAqiChartFragment : Fragment() {
 
     private lateinit var chart: LineChart
 
-    private var START_MILLIS: Long = -1L
+    private var mFirstEntryMillis: Long = -1L
+    private var mLastEntryMillis: Long = -1L
 
     private val SimpleDateFormat_hh_mm_ss_a = SimpleDateFormat("hh:mm:ss a", Locale.ENGLISH).also {
         it.timeZone = TimeZone.getDefault()
@@ -53,12 +54,27 @@ class CityAqiChartFragment : Fragment() {
         chart = root.findViewById(R.id.chart)
         initChartView(city)
 
-        viewModel.getCityAQIsLiveData(city).observe(viewLifecycleOwner) {
-            val aqiChartEntry = it[0]
-            if (BuildConfig.DEBUG) {
-                Log.d(LOG_TAG, "onChanged $aqiChartEntry")
+        viewModel.getLatestAQIasLiveData(city).observe(viewLifecycleOwner) {
+            // TODO - move logic to the ViewModel
+            val aqiChartEntry = it
+            if (mFirstEntryMillis == -1L) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(LOG_TAG, "onChanged first $aqiChartEntry")
+                }
+                mFirstEntryMillis = aqiChartEntry.time
+                mLastEntryMillis = aqiChartEntry.time
+                addEntry(aqiChartEntry)
+            } else if (aqiChartEntry.time >= mLastEntryMillis + 30000) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(LOG_TAG, "onChanged shown $aqiChartEntry")
+                }
+                mLastEntryMillis = aqiChartEntry.time
+                addEntry(aqiChartEntry)
+            } else {
+                if (BuildConfig.DEBUG) {
+                    Log.d(LOG_TAG, "onChanged dropped $aqiChartEntry")
+                }
             }
-            addEntry(aqiChartEntry)
         }
 
         return root
@@ -101,7 +117,7 @@ class CityAqiChartFragment : Fragment() {
         xl.setDrawGridLines(true)
         // xl.setAvoidFirstLastClipping(true); // adding some extra margin before first visible entry
         xl.setAxisMinimum(0f)
-        // xl.granularity = 30f // default 1f is better
+        xl.granularity = 30f // default 1f is better
         xl.isGranularityEnabled = true
         // xl.setAxisMaximum(4f); // no-auto-h-scrolling
         // xl.setEnabled(true); // default is true
@@ -123,7 +139,7 @@ class CityAqiChartFragment : Fragment() {
                 if (BuildConfig.DEBUG) {
                     Log.d(LOG_TAG, "format() $secondsSinceStart")
                 }
-                val dateOfGivenTime = Date(START_MILLIS + (secondsSinceStart * 1000).toLong())
+                val dateOfGivenTime = Date(mFirstEntryMillis + (secondsSinceStart * 1000).toLong())
                 val formatted = SimpleDateFormat_hh_mm_ss_a.format(dateOfGivenTime)
                 map[secondsSinceStart] = formatted
                 return formatted
@@ -139,16 +155,11 @@ class CityAqiChartFragment : Fragment() {
 
         val rightAxis: YAxis = chart.getAxisRight()
         rightAxis.setEnabled(false)
-
     }
 
     private fun addEntry(aqiChartEntry: AqiChartEntry) {
         val data: LineData = chart.getData()
-
-        if (START_MILLIS == -1L) {
-            START_MILLIS = aqiChartEntry.time
-        }
-        val secondsSinceStart = ((aqiChartEntry.time - START_MILLIS) / 1000).toFloat()
+        val secondsSinceStart = ((aqiChartEntry.time - mFirstEntryMillis) / 1000).toFloat()
         data.addEntry(Entry(secondsSinceStart, aqiChartEntry.aqi.toFloat()), 0)
         data.notifyDataChanged()
 
@@ -156,7 +167,8 @@ class CityAqiChartFragment : Fragment() {
         chart.notifyDataSetChanged()
 
         // limit the number of visible entries
-        chart.setVisibleXRangeMaximum(10f) // TODO - why not in initChartView?
+        chart.setVisibleXRangeMinimum(70f)
+        chart.setVisibleXRangeMaximum(160f) // TODO - why not in initChartView?
         //chart.setVisibleYRangeMaximum(150f, YAxis.AxisDependency.LEFT);
 
         // move to the latest entry

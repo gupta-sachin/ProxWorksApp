@@ -43,6 +43,6 @@ interface CityDao {
     }
 
     // return latest row for each city
-    @Query("SELECT aqi,time FROM city_table WHERE city = :query ORDER BY time DESC")
-    fun getCityAQIs(query: String): Flow<List<AqiChartEntry>>
+    @Query("SELECT aqi,time FROM city_table WHERE city = :query ORDER BY time DESC LIMIT 1")
+    fun getLatestAQIinFlow(query: String): Flow<AqiChartEntry>
 }

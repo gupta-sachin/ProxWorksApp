@@ -91,8 +91,9 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
         _eventItemClickedLiveData.value = Event.ItemClicked(city)
     }
 
-    fun getCityAQIsLiveData(city: String): LiveData<List<AqiChartEntry>> =
-        repository.getCityAQIs(city).asLiveData()
+    // TODO - cache data in viewModel for config changes
+    fun getLatestAQIasLiveData(city: String): LiveData<AqiChartEntry> =
+        repository.getLatestAQIinFlow(city).asLiveData()
 
     fun connect() {
         repository.connect(this)

@@ -34,5 +34,5 @@ class CityRepository(private val cityDao: CityDao) {
         cityDao.insertOrUpdate(cities)
     }
 
-    fun getCityAQIs(city: String): Flow<List<AqiChartEntry>> = cityDao.getCityAQIs(city)
+    fun getLatestAQIinFlow(city: String): Flow<AqiChartEntry> = cityDao.getLatestAQIinFlow(city)
 }
