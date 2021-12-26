@@ -23,8 +23,6 @@ import com.proximity.app.R
 import com.proximity.aqi.data.AqiChartEntry
 import com.proximity.aqi.vm.CityViewModel
 import com.proximity.aqi.vm.CityViewModelFactory
-import java.text.SimpleDateFormat
-import java.util.*
 
 private const val LOG_TAG = "CityAqiChartFragment"
 
@@ -35,13 +33,6 @@ class CityAqiChartFragment : Fragment() {
     }
 
     private lateinit var chart: LineChart
-
-    private var mFirstEntryMillis: Long = -1L
-    private var mLastEntryMillis: Long = -1L
-
-    private val SimpleDateFormat_hh_mm_ss_a = SimpleDateFormat("hh:mm:ss a", Locale.ENGLISH).also {
-        it.timeZone = TimeZone.getDefault()
-    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -54,27 +45,8 @@ class CityAqiChartFragment : Fragment() {
         chart = root.findViewById(R.id.chart)
         initChartView(city)
 
-        viewModel.getLatestAQIasLiveData(city).observe(viewLifecycleOwner) {
-            // TODO - move logic to the ViewModel
-            val aqiChartEntry = it
-            if (mFirstEntryMillis == -1L) {
-                if (BuildConfig.DEBUG) {
-                    Log.d(LOG_TAG, "onChanged first $aqiChartEntry")
-                }
-                mFirstEntryMillis = aqiChartEntry.time
-                mLastEntryMillis = aqiChartEntry.time
-                addEntry(aqiChartEntry)
-            } else if (aqiChartEntry.time >= mLastEntryMillis + 30000) {
-                if (BuildConfig.DEBUG) {
-                    Log.d(LOG_TAG, "onChanged shown $aqiChartEntry")
-                }
-                mLastEntryMillis = aqiChartEntry.time
-                addEntry(aqiChartEntry)
-            } else {
-                if (BuildConfig.DEBUG) {
-                    Log.d(LOG_TAG, "onChanged dropped $aqiChartEntry")
-                }
-            }
+        viewModel.getAQIsAsLiveData(city, 30).observe(viewLifecycleOwner) {
+            addEntry(it)
         }
 
         return root
@@ -124,27 +96,16 @@ class CityAqiChartFragment : Fragment() {
         xl.setPosition(XAxis.XAxisPosition.BOTTOM)
         xl.setLabelRotationAngle(270f)
 
-        xl.setValueFormatter(object : ValueFormatter() {
-
-            private val map = mutableMapOf<Float, String>()
-
+        xl.valueFormatter = object : ValueFormatter() {
             override fun getFormattedValue(value: Float): String {
                 if (BuildConfig.DEBUG) {
                     Log.d(LOG_TAG, "getFormattedValue() $value")
                 }
-                return map[value] ?: format(value)
+                // TODO - why this is needed multiple times for many values?
+                // is anything wrong with chart API or it's configuration?
+                return viewModel.getTimeLabel(value)
             }
-
-            private fun format(secondsSinceStart: Float): String {
-                if (BuildConfig.DEBUG) {
-                    Log.d(LOG_TAG, "format() $secondsSinceStart")
-                }
-                val dateOfGivenTime = Date(mFirstEntryMillis + (secondsSinceStart * 1000).toLong())
-                val formatted = SimpleDateFormat_hh_mm_ss_a.format(dateOfGivenTime)
-                map[secondsSinceStart] = formatted
-                return formatted
-            }
-        })
+        }
 
         val leftAxis: YAxis = chart.getAxisLeft()
         //leftAxis.setTypeface(tfLight)
@@ -159,8 +120,7 @@ class CityAqiChartFragment : Fragment() {
 
     private fun addEntry(aqiChartEntry: AqiChartEntry) {
         val data: LineData = chart.getData()
-        val secondsSinceStart = ((aqiChartEntry.time - mFirstEntryMillis) / 1000).toFloat()
-        data.addEntry(Entry(secondsSinceStart, aqiChartEntry.aqi.toFloat()), 0)
+        data.addEntry(Entry(aqiChartEntry.secondsSinceFirstEntry, aqiChartEntry.aqi.toFloat()), 0)
         data.notifyDataChanged()
 
         // let the chart know it's data has changed
@@ -172,7 +132,7 @@ class CityAqiChartFragment : Fragment() {
         //chart.setVisibleYRangeMaximum(150f, YAxis.AxisDependency.LEFT);
 
         // move to the latest entry
-        chart.moveViewToX(secondsSinceStart)
+        chart.moveViewToX(aqiChartEntry.secondsSinceFirstEntry)
 
         // this automatically refreshes the chart (calls invalidate())
         // chart.moveViewTo(data.getXValCount()-7, 55f,
@@ -195,5 +155,4 @@ class CityAqiChartFragment : Fragment() {
         set.setDrawValues(false)
         return set
     }
-
 }

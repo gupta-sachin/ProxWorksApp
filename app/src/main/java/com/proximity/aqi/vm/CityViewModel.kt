@@ -1,20 +1,40 @@
 package com.proximity.aqi.vm
 
+import android.util.Log
 import androidx.annotation.ColorRes
 import androidx.lifecycle.*
+import com.proximity.app.BuildConfig
 import com.proximity.app.R
 import com.proximity.aqi.data.AqiChartEntry
 import com.proximity.aqi.data.City
 import com.proximity.aqi.data.CityUi
 import com.proximity.aqi.data.Event
 import com.proximity.aqi.data.repository.CityRepository
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
 
+private const val LOG_TAG = "CityViewModel"
+
 class CityViewModel(private val repository: CityRepository) : ViewModel() {
+
+    fun connect() {
+        repository.connect(this)
+    }
+
+    fun closeConnection() {
+        repository.closeConnection()
+    }
+
+    fun insertOrUpdate(cities: List<City>) = viewModelScope.launch {
+        repository.insertOrUpdate(cities)
+    }
+
+    ///////////////////////////
 
     private val ONE_SECOND_AS_MILLIS = TimeUnit.SECONDS.toMillis(1)
 
@@ -29,7 +49,7 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
         it.timeZone = TimeZone.getDefault()
     }
 
-    // Using LiveData and caching what allWords returns has several benefits:
+    // Using LiveData and caching the shown data has several benefits:
     // - We can put an observer on the data (instead of polling for changes) and only update the
     //   the UI when the data actually changes.
     // - Repository is completely separated from the UI through the ViewModel.
@@ -76,12 +96,7 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Launching a new coroutine to insert the data in a non-blocking way
-     */
-    fun insertOrUpdate(cities: List<City>) = viewModelScope.launch {
-        repository.insertOrUpdate(cities)
-    }
+    /////////////////////////////
 
     private val _eventItemClickedLiveData = MutableLiveData<Event.ItemClicked>()
 
@@ -91,16 +106,62 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
         _eventItemClickedLiveData.value = Event.ItemClicked(city)
     }
 
-    // TODO - cache data in viewModel for config changes
-    fun getLatestAQIasLiveData(city: String): LiveData<AqiChartEntry> =
-        repository.getLatestAQIinFlow(city).asLiveData()
+    //////////////////////////
 
-    fun connect() {
-        repository.connect(this)
+    private var mFirstEntryMillis: Long = -1L
+    private var mLastEntryMillis: Long = -1L
+
+    // TODO - cache data in viewModel for config changes
+    fun getAQIsAsLiveData(city: String, intervalInSeconds: Int): LiveData<AqiChartEntry> =
+        repository.getLatestAQIinFlow(city).filter { isEntryToBeShown(it, intervalInSeconds) }
+            .asLiveData()
+
+    private fun isEntryToBeShown(aqiChartEntry: AqiChartEntry, intervalInSeconds: Int): Boolean {
+        if (mFirstEntryMillis == -1L) {
+            if (BuildConfig.DEBUG) {
+                Log.d(LOG_TAG, "isEntryToBeShown first $aqiChartEntry")
+            }
+            mFirstEntryMillis = aqiChartEntry.time
+            mLastEntryMillis = aqiChartEntry.time
+            aqiChartEntry.secondsSinceFirstEntry =
+                ((aqiChartEntry.time - mFirstEntryMillis) / 1000).toFloat()
+            return true
+        }
+        if (aqiChartEntry.time >= mLastEntryMillis + intervalInSeconds * ONE_SECOND_AS_MILLIS) {
+            if (BuildConfig.DEBUG) {
+                Log.d(LOG_TAG, "isEntryToBeShown shown $aqiChartEntry")
+            }
+            mLastEntryMillis = aqiChartEntry.time
+            aqiChartEntry.secondsSinceFirstEntry =
+                ((aqiChartEntry.time - mFirstEntryMillis) / 1000).toFloat()
+            return true
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(LOG_TAG, "isEntryToBeShown dropped $aqiChartEntry")
+        }
+        return false
     }
 
-    fun closeConnection() {
-        repository.closeConnection()
+    /////////////////////
+
+    private val xAxisValueLabelMap = mutableMapOf<Float, String>()
+
+    private val SimpleDateFormat_hh_mm_ss_a = SimpleDateFormat("hh:mm:ss a", Locale.ENGLISH).also {
+        it.timeZone = TimeZone.getDefault()
+    }
+
+    fun getTimeLabel(secondsSinceStart: Float): String {
+        val cachedLabel = xAxisValueLabelMap[secondsSinceStart]
+        if (BuildConfig.DEBUG) {
+            Log.d(LOG_TAG, "getTimeLabel() $secondsSinceStart $cachedLabel")
+        }
+        if (cachedLabel != null) {
+            return cachedLabel
+        }
+        val dateOfGivenTime = Date(mFirstEntryMillis + secondsSinceStart.toLong() * 1000)
+        val formatted = SimpleDateFormat_hh_mm_ss_a.format(dateOfGivenTime)
+        xAxisValueLabelMap[secondsSinceStart] = formatted
+        return formatted
     }
 }
 

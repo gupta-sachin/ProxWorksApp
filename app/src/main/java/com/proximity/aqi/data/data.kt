@@ -2,6 +2,7 @@ package com.proximity.aqi.data
 
 import androidx.annotation.ColorRes
 import androidx.room.Entity
+import androidx.room.Ignore
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "city_table")
@@ -24,7 +25,10 @@ data class CityUi(
 data class AqiChartEntry(
     val aqi: Double,
     val time: Long
-)
+) {
+    @Ignore
+    var secondsSinceFirstEntry: Float = 0f;
+}
 
 sealed class Event {
     data class ItemClicked(
