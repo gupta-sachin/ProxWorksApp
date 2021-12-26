@@ -14,8 +14,7 @@
         android:theme="@style/Theme.ProxWorksApp">
         <activity
             android:name="com.proximity.aqi.view.AqiMainActivity"
-            android:exported="true"
-            android:screenOrientation="portrait">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

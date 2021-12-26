@@ -42,7 +42,11 @@ interface CityDao {
         }
     }
 
-    // return latest row for each city
+    // return all rows for query city
+    @Query("SELECT aqi,time FROM city_table WHERE city = :query ORDER BY time ASC")
+    suspend fun getAQIs(query: String): List<AqiChartEntry>
+
+    // return latest row for query city
     @Query("SELECT aqi,time FROM city_table WHERE city = :query ORDER BY time DESC LIMIT 1")
     fun getLatestAQIinFlow(query: String): Flow<AqiChartEntry>
 }

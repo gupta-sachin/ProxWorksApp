@@ -14,8 +14,8 @@ class CityRepository(private val cityDao: CityDao) {
 
     // Room executes all queries on a separate thread.
     // Observed Flow will notify the observer when the data has changed.
+    @JvmField
     val citiesFlow: Flow<List<City>> = cityDao.getCities()
-
 
     fun connect(viewModel: CityViewModel) {
         CityAqiSource.connect(viewModel)
@@ -33,6 +33,8 @@ class CityRepository(private val cityDao: CityDao) {
     suspend fun insertOrUpdate(cities: List<City>) {
         cityDao.insertOrUpdate(cities)
     }
+
+    suspend fun getAQIs(city: String): List<AqiChartEntry> = cityDao.getAQIs(city)
 
     fun getLatestAQIinFlow(city: String): Flow<AqiChartEntry> = cityDao.getLatestAQIinFlow(city)
 }

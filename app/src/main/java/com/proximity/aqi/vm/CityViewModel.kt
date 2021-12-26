@@ -10,9 +10,11 @@ import com.proximity.aqi.data.City
 import com.proximity.aqi.data.CityUi
 import com.proximity.aqi.data.Event
 import com.proximity.aqi.data.repository.CityRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -53,6 +55,7 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
     // - We can put an observer on the data (instead of polling for changes) and only update the
     //   the UI when the data actually changes.
     // - Repository is completely separated from the UI through the ViewModel.
+    @JvmField
     val citiesLiveData: LiveData<List<CityUi>> = repository.citiesFlow.map { list ->
         list.map {
             CityUi(
@@ -100,23 +103,59 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
 
     private val _eventItemClickedLiveData = MutableLiveData<Event.ItemClicked>()
 
+    @JvmField
     val eventItemClickedLiveData: LiveData<Event.ItemClicked> = _eventItemClickedLiveData
 
     fun sendEventItemClicked(city: String) {
         _eventItemClickedLiveData.value = Event.ItemClicked(city)
     }
 
-    //////////////////////////
+    /////////////////////////////
+
+    private val MIN_INTERVAL_MILLIS = 30 * ONE_SECOND_AS_MILLIS
 
     private var mFirstEntryMillis: Long = -1L
     private var mLastEntryMillis: Long = -1L
 
-    // TODO - cache data in viewModel for config changes
-    fun getAQIsAsLiveData(city: String, intervalInSeconds: Int): LiveData<AqiChartEntry> =
-        repository.getLatestAQIinFlow(city).filter { isEntryToBeShown(it, intervalInSeconds) }
+    private var getAQIsJob: Job? = null
+
+    private val _aqisListLiveData = MutableLiveData<List<AqiChartEntry>>()
+
+    @JvmField
+    val aqisListLiveData: LiveData<List<AqiChartEntry>> = _aqisListLiveData
+
+    fun getAQIs(city: String) {
+        getAQIsJob?.cancel() // cancel previous job, if still active
+        getAQIsJob = viewModelScope.launch(Dispatchers.IO) {
+            // clear previous data
+            mFirstEntryMillis = -1
+            mLastEntryMillis = -1
+            _aqisListLiveData.postValue(emptyList())
+
+            // fetch/filter new data
+            val list = repository.getAQIs(city)
+            val filteredList = mutableListOf<AqiChartEntry>()
+            for (entry in list) {
+                if (isEntryToBeShown(entry)) {
+                    filteredList.add(entry)
+                }
+            }
+            if (BuildConfig.DEBUG) {
+                Log.d(LOG_TAG, "getAQIs() ${list.size} ${filteredList.size}")
+            }
+            if (isActive) {
+                _aqisListLiveData.postValue(filteredList)
+            }
+        }
+    }
+
+    //////////////////////////
+
+    fun getAQIsAsLiveData(city: String): LiveData<AqiChartEntry> =
+        repository.getLatestAQIinFlow(city).filter { isEntryToBeShown(it) }
             .asLiveData()
 
-    private fun isEntryToBeShown(aqiChartEntry: AqiChartEntry, intervalInSeconds: Int): Boolean {
+    private fun isEntryToBeShown(aqiChartEntry: AqiChartEntry): Boolean {
         if (mFirstEntryMillis == -1L) {
             if (BuildConfig.DEBUG) {
                 Log.d(LOG_TAG, "isEntryToBeShown first $aqiChartEntry")
@@ -127,7 +166,7 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
                 ((aqiChartEntry.time - mFirstEntryMillis) / 1000).toFloat()
             return true
         }
-        if (aqiChartEntry.time >= mLastEntryMillis + intervalInSeconds * ONE_SECOND_AS_MILLIS) {
+        if (aqiChartEntry.time >= mLastEntryMillis + MIN_INTERVAL_MILLIS) {
             if (BuildConfig.DEBUG) {
                 Log.d(LOG_TAG, "isEntryToBeShown shown $aqiChartEntry")
             }

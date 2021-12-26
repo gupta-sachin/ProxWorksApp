@@ -45,8 +45,15 @@ class CityAqiChartFragment : Fragment() {
         chart = root.findViewById(R.id.chart)
         initChartView(city)
 
-        viewModel.getAQIsAsLiveData(city, 30).observe(viewLifecycleOwner) {
-            addEntry(it)
+        viewModel.getAQIs(city)
+
+        viewModel.aqisListLiveData.observe(viewLifecycleOwner) { list ->
+            if (list.isNotEmpty()) {
+                addEntries(list)
+            }
+            viewModel.getAQIsAsLiveData(city).observe(viewLifecycleOwner) {
+                addEntry(it)
+            }
         }
 
         return root
@@ -133,6 +140,36 @@ class CityAqiChartFragment : Fragment() {
 
         // move to the latest entry
         chart.moveViewToX(aqiChartEntry.secondsSinceFirstEntry)
+
+        // this automatically refreshes the chart (calls invalidate())
+        // chart.moveViewTo(data.getXValCount()-7, 55f,
+        // AxisDependency.LEFT);
+
+    }
+
+    private fun addEntries(aqiChartEntries: List<AqiChartEntry>) {
+        val data: LineData = chart.getData()
+
+        val list = mutableListOf<Entry>()
+        for (entry in aqiChartEntries) {
+            if (BuildConfig.DEBUG) {
+                Log.d(LOG_TAG, "addEntries() ${entry.secondsSinceFirstEntry}")
+            }
+            list.add(Entry(entry.secondsSinceFirstEntry, entry.aqi.toFloat()))
+        }
+        (data.getDataSetByIndex(0) as LineDataSet).values = list
+        data.notifyDataChanged()
+
+        // let the chart know it's data has changed
+        chart.notifyDataSetChanged()
+
+        // limit the number of visible entries
+        chart.setVisibleXRangeMinimum(70f)
+        chart.setVisibleXRangeMaximum(160f) // TODO - why not in initChartView?
+        //chart.setVisibleYRangeMaximum(150f, YAxis.AxisDependency.LEFT);
+
+        // move to the latest entry
+        chart.moveViewToX(aqiChartEntries.last().secondsSinceFirstEntry)
 
         // this automatically refreshes the chart (calls invalidate())
         // chart.moveViewTo(data.getXValCount()-7, 55f,
