@@ -51,6 +51,9 @@ class AqiMainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        // We are closing connection here to avoid fetching data, when user is not on the app.
+        // But this also means, that if app is not killed and user will come back to the app,
+        // there may be some long gaps between the graph entries.
         viewModel.closeConnection()
         super.onPause()
     }

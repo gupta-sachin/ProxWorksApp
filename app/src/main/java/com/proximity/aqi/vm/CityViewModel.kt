@@ -12,6 +12,7 @@ import com.proximity.aqi.data.Event
 import com.proximity.aqi.data.repository.CityRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
@@ -125,12 +126,20 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
     val aqisListLiveData: LiveData<List<AqiChartEntry>> = _aqisListLiveData
 
     fun getAQIs(city: String) {
+        // Clear previous list here instead of inside coroutine.
+        // It is needed to ensure that observer will not receive previous data as soon as this method is called.
+        // And though it is must when different city is selected, we are clearing without checking the city,
+        // and thus, we will always fetch city-wise data from database and filter by interval, even if any city is re-selected.
+        // TODO - if we want to optimize it, we will need to have city-wise view-model-level cache.
+        if (_aqisListLiveData.value != null) {
+            _aqisListLiveData.value = emptyList()
+        }
+
         getAQIsJob?.cancel() // cancel previous job, if still active
         getAQIsJob = viewModelScope.launch(Dispatchers.IO) {
             // clear previous data
             mFirstEntryMillis = -1
             mLastEntryMillis = -1
-            _aqisListLiveData.postValue(emptyList())
 
             // fetch/filter new data
             val list = repository.getAQIs(city)
@@ -151,10 +160,23 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
 
     //////////////////////////
 
-    fun getAQIsAsLiveData(city: String): LiveData<AqiChartEntry> =
-        repository.getLatestAQIinFlow(city).filter { isEntryToBeShown(it) }
+    /**
+     * Ideally, [getAQIs] must already be called before calling this method, and in that case,
+     * the first latest entry will always be dropped by [isEntryToBeShown]
+     */
+    fun getLatestAqiAsLiveData(city: String): LiveData<AqiChartEntry> =
+        repository.getLatestAQIinFlow(city)
+            .distinctUntilChanged() // filter duplicates (though isEntryToBeShown can filter duplicates too)
+            .filter { isEntryToBeShown(it) } // filter by interval
             .asLiveData()
 
+    /**
+     * Checks if aqiChartEntry is to be shown on chart as per MIN_INTERVAL_MILLIS,
+     * Also sets the value of [AqiChartEntry.secondsSinceFirstEntry]
+     *
+     * @return true if entry is to be shown on chart, false otherwise
+     */
+    // TODO - if city-wise view-model-level cache will be implemented, each new shown entry will need to be added to that list
     private fun isEntryToBeShown(aqiChartEntry: AqiChartEntry): Boolean {
         if (mFirstEntryMillis == -1L) {
             if (BuildConfig.DEBUG) {
@@ -162,8 +184,7 @@ class CityViewModel(private val repository: CityRepository) : ViewModel() {
             }
             mFirstEntryMillis = aqiChartEntry.time
             mLastEntryMillis = aqiChartEntry.time
-            aqiChartEntry.secondsSinceFirstEntry =
-                ((aqiChartEntry.time - mFirstEntryMillis) / 1000).toFloat()
+            // aqiChartEntry.secondsSinceFirstEntry = 0f // default is also 0f
             return true
         }
         if (aqiChartEntry.time >= mLastEntryMillis + MIN_INTERVAL_MILLIS) {

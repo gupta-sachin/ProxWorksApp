@@ -27,7 +27,7 @@ data class AqiChartEntry(
     val time: Long
 ) {
     @Ignore
-    var secondsSinceFirstEntry: Float = 0f;
+    var secondsSinceFirstEntry: Float = 0f
 }
 
 sealed class Event {

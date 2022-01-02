@@ -45,13 +45,21 @@ class CityAqiChartFragment : Fragment() {
         chart = root.findViewById(R.id.chart)
         initChartView(city)
 
-        viewModel.getAQIs(city)
+        viewModel.getAQIs(city) // get AQIs available since app-start till now
 
         viewModel.aqisListLiveData.observe(viewLifecycleOwner) { list ->
-            if (list.isNotEmpty()) {
-                addEntries(list)
+            if (BuildConfig.DEBUG) {
+                Log.d(LOG_TAG, "aqisListLiveData#onChanged ${list.size}")
             }
-            viewModel.getAQIsAsLiveData(city).observe(viewLifecycleOwner) {
+            /** with current logic of [CityViewModel.getAQIs], emptyList() is sent first,
+            and we neither need to show it, nor need to observe for new AQIs in this case */
+            if (list.isEmpty()) {
+                return@observe
+            }
+            addEntries(list) // show AQIs available since app-start till now
+
+            // now observe for new AQIs
+            viewModel.getLatestAqiAsLiveData(city).observe(viewLifecycleOwner) {
                 addEntry(it)
             }
         }
