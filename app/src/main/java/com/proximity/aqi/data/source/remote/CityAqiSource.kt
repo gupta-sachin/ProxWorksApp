@@ -3,11 +3,15 @@ package com.proximity.aqi.data.source.remote
 import android.os.Looper
 import android.util.Log
 import com.proximity.app.BuildConfig
+import com.proximity.aqi.data.City
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
 import java.lang.Exception
 import java.net.URI
 import javax.net.ssl.SSLSocketFactory
@@ -20,11 +24,12 @@ object CityAqiSource {
 
     private lateinit var webSocketClient: WebSocketClient
 
+    @Volatile
     private var isConnected: Boolean = false
 
-    private var message: String? = null
+    private var citiesList: MutableList<City>? = null
 
-    fun connect(): Flow<String> = flow {
+    fun connect(): Flow<MutableList<City>> = flow {
         closeConnection()
         createWebSocketClient()
         val socketFactory: SSLSocketFactory = SSLSocketFactory.getDefault() as SSLSocketFactory
@@ -32,20 +37,13 @@ object CityAqiSource {
         webSocketClient.connect()
         isConnected = true
         while (isConnected) {
-            if (BuildConfig.DEBUG) {
-                val isBgThread = Looper.getMainLooper() != Looper.myLooper()
-                Log.v(LOG_TAG, "while $isConnected $isBgThread $message")
+            val _citiesList = citiesList
+            if (_citiesList != null && _citiesList.isNotEmpty()) {
+                emit(_citiesList)
+                citiesList = null
             }
-            val _message = message
-            if (_message != null) {
-                try {
-                    emit(_message)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-                message = null
-            }
-            delay(1000)
+            // TODO - can server add any extra field in message for appropriate/expected delay before next message
+            delay(100)
         }
     }
 
@@ -65,14 +63,37 @@ object CityAqiSource {
                 }
             }
 
-            override fun onMessage(_message: String?) {
+            override fun onMessage(message: String?) {
                 if (BuildConfig.DEBUG) {
-                    Log.v(LOG_TAG, "onMessage: $_message")
+                    val isBgThread = Looper.getMainLooper() != Looper.myLooper()
+                    Log.v(LOG_TAG, "onMessage: $isBgThread $message")
                 }
-                if (_message.isNullOrBlank()) {
+                if (message.isNullOrBlank()) {
                     return
                 }
-                message = _message
+                val time = System.currentTimeMillis() // most accurate time can be fetched here
+                val cities = mutableListOf<City>()
+                try {
+                    val jsonArray = JSONArray(message)
+
+                    for (i in 0 until jsonArray.length()) {
+                        try {
+                            val jsonObject: JSONObject = jsonArray.getJSONObject(i)
+                            val city = jsonObject.getString("city")
+                            val aqi = jsonObject.getDouble("aqi")
+                            cities.add(City(city, aqi, time))
+                        } catch (e: JSONException) {
+                            if (BuildConfig.DEBUG) {
+                                Log.e(LOG_TAG, "onMessage i:$i", e)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    if (BuildConfig.DEBUG) {
+                        Log.e(LOG_TAG, "onMessage", e)
+                    }
+                }
+                citiesList = cities
             }
 
             override fun onClose(code: Int, reason: String?, remote: Boolean) {
