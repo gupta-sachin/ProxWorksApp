@@ -6,17 +6,13 @@ import androidx.lifecycle.*
 import com.proximity.app.BuildConfig
 import com.proximity.app.R
 import com.proximity.aqi.data.AqiChartEntry
-import com.proximity.aqi.data.City
 import com.proximity.aqi.data.CityUi
 import com.proximity.aqi.data.Event
 import com.proximity.aqi.data.repository.CityRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -25,16 +21,12 @@ private const val LOG_TAG = "CityViewModel"
 
 class CityViewModel(private val repository: CityRepository) : ViewModel() {
 
-    fun connect() {
-        repository.connect(this)
+    fun connect() = viewModelScope.launch(Dispatchers.IO) {
+        repository.connect()
     }
 
     fun closeConnection() {
         repository.closeConnection()
-    }
-
-    fun insertOrUpdate(cities: List<City>) = viewModelScope.launch {
-        repository.insertOrUpdate(cities)
     }
 
     ///////////////////////////

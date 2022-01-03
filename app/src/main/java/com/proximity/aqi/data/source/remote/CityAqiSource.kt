@@ -3,13 +3,11 @@ package com.proximity.aqi.data.source.remote
 import android.os.Looper
 import android.util.Log
 import com.proximity.app.BuildConfig
-import com.proximity.aqi.data.City
-import com.proximity.aqi.vm.CityViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
-import org.json.JSONArray
-import org.json.JSONException
-import org.json.JSONObject
 import java.lang.Exception
 import java.net.URI
 import javax.net.ssl.SSLSocketFactory
@@ -22,20 +20,39 @@ object CityAqiSource {
 
     private lateinit var webSocketClient: WebSocketClient
 
-    private lateinit var viewModel: CityViewModel
+    private var isConnected: Boolean = false
 
-    fun connect(viewModel: CityViewModel) {
+    private var message: String? = null
+
+    fun connect(): Flow<String> = flow {
         closeConnection()
-        this.viewModel = viewModel
         createWebSocketClient()
         val socketFactory: SSLSocketFactory = SSLSocketFactory.getDefault() as SSLSocketFactory
         webSocketClient.setSocketFactory(socketFactory)
         webSocketClient.connect()
+        isConnected = true
+        while (isConnected) {
+            if (BuildConfig.DEBUG) {
+                val isBgThread = Looper.getMainLooper() != Looper.myLooper()
+                Log.v(LOG_TAG, "while $isConnected $isBgThread $message")
+            }
+            val _message = message
+            if (_message != null) {
+                try {
+                    emit(_message)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                message = null
+            }
+            delay(1000)
+        }
     }
 
     fun closeConnection() {
         if (::webSocketClient.isInitialized) {
             webSocketClient.close()
+            isConnected = false
         }
     }
 
@@ -48,36 +65,14 @@ object CityAqiSource {
                 }
             }
 
-            override fun onMessage(message: String?) {
+            override fun onMessage(_message: String?) {
                 if (BuildConfig.DEBUG) {
-                    assert(Looper.getMainLooper() != Looper.myLooper())
-                    Log.d(LOG_TAG, "onMessage: $message")
+                    Log.v(LOG_TAG, "onMessage: $_message")
                 }
-                if (message.isNullOrBlank()) {
+                if (_message.isNullOrBlank()) {
                     return
                 }
-                try {
-                    val jsonArray = JSONArray(message)
-                    val time = System.currentTimeMillis()
-                    val cities = mutableListOf<City>()
-                    for (i in 0 until jsonArray.length()) {
-                        try {
-                            val jsonObject: JSONObject = jsonArray.getJSONObject(i)
-                            val city = jsonObject.getString("city")
-                            val aqi = jsonObject.getDouble("aqi")
-                            cities.add(City(city, aqi, time))
-                        } catch (e: JSONException) {
-                            if (BuildConfig.DEBUG) {
-                                Log.e(LOG_TAG, "onMessage i:$i", e)
-                            }
-                        }
-                    }
-                    viewModel.insertOrUpdate(cities)
-                } catch (e: Exception) {
-                    if (BuildConfig.DEBUG) {
-                        Log.e(LOG_TAG, "onMessage", e)
-                    }
-                }
+                message = _message
             }
 
             override fun onClose(code: Int, reason: String?, remote: Boolean) {
